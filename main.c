@@ -38,9 +38,19 @@
 /* Private function prototypes -----------------------------------------------*/
 static void GPIO_Config(void);
 static void TIM2_Config(void);
+static void TIM4_Config(void);
+static void AWU_Config(void);
 /* Private functions ---------------------------------------------------------*/
 /* Public functions ----------------------------------------------------------*/
 
+/* Public variables ----------------------------------------------------------*/
+__IO u32 tim4Tick=0; 
+u32 delayCount;
+u32 sleepCount;
+u8  keyFlag=0;
+u8  keyState=0;
+u32  keyDelay=0;
+u8  sleepFlag=0;
 /**
   * @brief  Main program.
   * @param  None
@@ -48,26 +58,157 @@ static void TIM2_Config(void);
   */
 void main(void)
 {
+  u8 LED1State=0;
+  u32 temp;
+  u16 j;
+  
+  /* CLK  configuration -----------------------------------------*/
+  CLK_DeInit();
+  CLK_MasterPrescalerConfig (CLK_MasterPrescaler_HSIDiv1);  
+  
   /* GPIO configuration -----------------------------------------*/
   GPIO_Config();  
 
   /* TIM2 configuration -----------------------------------------*/
   TIM2_Config();  
   
+  /* TIM4 configuration -----------------------------------------*/
+  TIM4_Config();  
+
+  /* AWU configuration -----------------------------------------*/
+  //AWU_Config();  
+  
+  enableInterrupts();
+  
+  
+  delayCount=tim4Tick;
+  sleepCount=tim4Tick;
+  j=11428;
+  TIM2_SetAutoreload (j);  
   while (1)
-  {} 
+  {
+    if(keyState==0)
+    {
+      if(GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)==RESET)
+      {
+        keyDelay=tim4Tick;
+        keyState=1;
+      }
+    }
+    else if(keyState==1)
+    {
+      if((tim4Tick-keyDelay)>20)
+      {
+        if(GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)==RESET)
+        {
+          keyState=2;
+          keyFlag=1;
+        }
+        else
+          keyState=0;
+      }
+    }
+    else if(keyState==2)
+    {
+      if(GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)!=RESET)
+        keyState=0;
+    }
+    if(keyFlag==1)
+    {
+      keyFlag=0;
+      if(sleepFlag==0)
+      {
+        sleepFlag=1;
+      }
+      else
+      {
+        sleepFlag=0;
+      }
+    }
+
+     if(LED1State==0)
+     {
+       
+       if((tim4Tick-delayCount)>1)
+       {
+         temp=(tim4Tick-delayCount);
+         delayCount=tim4Tick;
+         if(j>5333)
+         {
+           j=j-((11428-5333  )/230)*temp;
+           TIM2_SetAutoreload (j);
+            if(j<=5333)
+            {
+              LED1State=1;
+              GPIO_SetBits(GPIOB, GPIO_Pin_5);
+            }
+         }
+         
+       }
+     }
+     else
+     {
+       if((tim4Tick-delayCount)>1)
+       {
+         temp=(tim4Tick-delayCount);
+         delayCount=tim4Tick;
+         if(j<11428)
+         {
+           j=j+((11428-5333  )/100)*temp;
+           TIM2_SetAutoreload (j);
+            if(j>=11428)
+            {
+              LED1State=0;
+              GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+            }
+         }
+       }       
+     }
+     if((tim4Tick-sleepCount)>200)
+     {
+       if(sleepFlag==1)
+       {
+        //GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+        //GPIO_Init(GPIOB, GPIO_Pin_5, GPIO_Mode_In_FL_No_IT);
+        //GPIO_Init(GPIOB, GPIO_Pin_0, GPIO_Mode_In_FL_No_IT);
+        disableInterrupts();
+        TIM4_DeInit();
+        TIM2_DeInit();
+        GPIO_DeInit(GPIOB);
+        GPIO_DeInit(GPIOC);
+        GPIO_Init(GPIOC, GPIO_Pin_4, GPIO_Mode_In_PU_IT);
+        enableInterrupts();
+        halt();
+        GPIO_Config();  
+        TIM2_Config(); 
+        TIM4_Config(); 
+        sleepCount=tim4Tick;
+        keyState=0;
+       }
+     }
+    
+  } 
 }
 
 /**r
-  * @brief  Configure PG6 to allow delay of TIM2 channels computation
+  * @brief  Configure PG6 to allow delay of AWU channels computation
   * @param  None
   * @retval None
   */
+static void AWU_Config(void)
+{
+
+  AWU_DeInit();
+  AWU_Init(AWU_Timebase_No_IT);
+}
+
+
 static void GPIO_Config(void)
 {
   /* Set PG.6 pin */
-  GPIO_Init(GPIOC, GPIO_Pin_6, GPIO_Mode_Out_PP_Low_Fast);
-  GPIO_SetBits(GPIOC, GPIO_Pin_6);
+  GPIO_Init(GPIOC, GPIO_Pin_4, GPIO_Mode_In_PU_IT);
+  GPIO_Init(GPIOB, GPIO_Pin_5, GPIO_Mode_Out_PP_Low_Slow);
+  EXTI_SetPinSensitivity(EXTI_Pin_4,EXTI_Trigger_Falling);
 }
 
 /**
@@ -82,13 +223,13 @@ static void TIM2_Config(void)
   CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
 
   /* Config TIM2 Channel 1 and channel 2 pins */
-  GPIO_Init(GPIOB, GPIO_Pin_0 | GPIO_Pin_2, GPIO_Mode_Out_PP_High_Fast);
+  GPIO_Init(GPIOB, GPIO_Pin_0, GPIO_Mode_Out_PP_High_Fast);
 
   /* Time base configuration */      
-  TIM2_TimeBaseInit(TIM2_Prescaler_128, TIM2_CounterMode_Up, 65535);
+  TIM2_TimeBaseInit(TIM2_Prescaler_1, TIM2_CounterMode_Up, 5333);
 
   /* Prescaler configuration */
-  TIM2_PrescalerConfig(TIM2_Prescaler_128, TIM2_PSCReloadMode_Immediate);
+  TIM2_PrescalerConfig(TIM2_Prescaler_1, TIM2_PSCReloadMode_Immediate);
 
   /* Output Compare Active Mode configuration: Channel1 */
   /*
@@ -97,18 +238,9 @@ static void TIM2_Config(void)
     TIM2_Pulse = CCR1_Val
     TIM2_OCPolarity = TIM2_OCPOLARITY_HIGH
   */
-  TIM2_OC1Init(TIM2_OCMode_Active, TIM2_OutputState_Enable, CCR1_Val, TIM2_OCPolarity_High, TIM2_OCIdleState_Reset);
-  
-  TIM2_OC1PreloadConfig(DISABLE);
+  TIM2_OC1Init(TIM2_OCMode_Toggle, TIM2_OutputState_Enable, 0, TIM2_OCPolarity_High, TIM2_OCIdleState_Reset);
 
   /* Output Compare Active Mode configuration: Channel2 */
-  
-  /*TIM2_Pulse = CCR2_Val  */
-  
-  TIM2_OC2Init(TIM2_OCMode_Active, TIM2_OutputState_Enable,CCR2_Val, TIM2_OCPolarity_High, TIM2_OCIdleState_Reset); 
-  TIM2_OC2PreloadConfig(DISABLE);
-  
-  TIM2_ARRPreloadConfig(ENABLE);
   
   /* Enable TIM2 outputs */
   TIM2_CtrlPWMOutputs(ENABLE);
@@ -116,6 +248,32 @@ static void TIM2_Config(void)
   /* TIM2 enable counter */
   TIM2_Cmd(ENABLE);
 }
+
+
+/**
+  * @brief  Configure TIM2 peripheral to generate 3 different signals with 3
+  *         different delays
+  * @param  None
+  * @retval None
+  */
+static void TIM4_Config(void)
+{
+  /* Enable TIM2 clock */
+  CLK_PeripheralClockConfig (CLK_Peripheral_TIM4 , ENABLE); 
+
+  TIM4_DeInit(); 
+  
+  /* Time base configuration */      
+  TIM4_TimeBaseInit(TIM4_Prescaler_128, 0x7D); // 127 and 0x7D == Interrupt 1mS 
+  
+  TIM4_ClearFlag(TIM4_FLAG_Update);
+  
+  TIM4_ITConfig(TIM4_IT_Update, ENABLE); 
+  
+  TIM4_Cmd(ENABLE);    // Enable TIM4  
+}
+
+
 
 #ifdef  USE_FULL_ASSERT
 /**

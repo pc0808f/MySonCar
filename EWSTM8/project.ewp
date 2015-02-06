@@ -17,7 +17,7 @@
         <debug>1</debug>
         <option>
           <name>GenDeviceSelectMenu</name>
-          <state>STM8L101K3T	STM8L101K3T</state>
+          <state>STM8L101F3P	STM8L101F3P</state>
         </option>
         <option>
           <name>GenCodeModel</name>
@@ -70,7 +70,7 @@
         </option>
         <option>
           <name>GenLibInFormatterDescription</name>
-          <state>No specifier n, no float, no scan set, no assignment suppressing.</state>
+          <state>Full formatting, without multibytes.</state>
         </option>
         <option>
           <name>GenLibOutFormatter</name>
@@ -79,7 +79,7 @@
         </option>
         <option>
           <name>GenLibOutFormatterDescription</name>
-          <state>No specifier a or A, no specifier n, no float.</state>
+          <state>Full formatting, without multibytes.</state>
         </option>
         <option>
           <name>GenStackSize</name>

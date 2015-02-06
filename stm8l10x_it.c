@@ -31,7 +31,8 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
+/* extern variables -----------------------------------------------------------------*/
+extern u32 tim4Tick; 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -146,6 +147,7 @@ INTERRUPT_HANDLER(EXTI2_IRQHandler, 10)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+
 }
 
 /**
@@ -170,6 +172,7 @@ INTERRUPT_HANDLER(EXTI4_IRQHandler, 12)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+  EXTI_ClearITPendingBit(EXTI_IT_Pin4);
 }
 
 /**
@@ -277,6 +280,9 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_IRQHandler, 25)
     /* In order to detect unexpected events during development,
        it is recommended to set a breakpoint on the following instruction.
     */
+  
+  tim4Tick++;
+  TIM4_ClearITPendingBit(TIM4_IT_Update); 
 }
 
 /**
